@@ -2,23 +2,43 @@
 
 ann_max_steps(100000).
 
-ann_step_loop(_Tag, _Encode, _Legal, _Execute, State, _Opts, State) :-
+ann_step_loop(Tag, Encode, Legal, Execute, State0, Opts, State) :-
+    ann_driver_loop(Tag, Encode, Legal, Execute, State0, Opts, [], Trace0, State),
+    ( memberchk(trace(on), Opts) -> reverse(Trace0, _Trace) ; true ).
+
+ann_driver_loop(_Tag, _Encode, _Legal, _Execute, State, Opts, Trace0, Trace, State) :-
     State =.. [_|Args],
     last(Args, Step),
-    ann_max_steps(Default),
-    Step >= Default,
+    step_budget(Opts, Budget),
+    Step >= Budget,
     !,
-    print_message(warning, ann_step_budget_exhausted(Step)).
-ann_step_loop(Tag, Encode, Legal, Execute, State0, Opts, State) :-
+    print_message(warning, ann_step_budget_exhausted(Step)),
+    Trace = Trace0,
+    fail.
+ann_driver_loop(Tag, Encode, Legal, Execute, State0, Opts, Trace0, Trace, State) :-
     call(Encode, State0, Features),
     call(Legal, State0, Actions),
-    Actions \= [],
-    ranked_actions(Tag, Features, Actions, Opts, Ranked),
-    member(Action, Ranked),
-    call(Execute, Action, State0, State1),
-    ann_step_loop(Tag, Encode, Legal, Execute, State1, Opts, State).
-ann_step_loop(_Tag, _Encode, Legal, _Execute, State, _Opts, State) :-
-    call(Legal, State, []).
+    ( Actions = [] ->
+        State = State0,
+        Trace = Trace0
+    ;
+        ranked_actions(Tag, Features, Actions, Opts, Ranked),
+        member(Action, Ranked),
+        call(Execute, Action, State0, State1),
+        ( memberchk(trace(on), Opts) ->
+            mnn_scores(Tag, Features, Scores),
+            Trace1 = [step(Features, Action, Scores)|Trace0]
+        ;
+            Trace1 = Trace0
+        ),
+        ann_driver_loop(Tag, Encode, Legal, Execute, State1, Opts,
+                        Trace1, Trace, State)
+    ).
+
+step_budget(Opts, Budget) :-
+    ( memberchk(max_steps(Budget0), Opts) -> Budget = Budget0
+    ; ann_max_steps(Budget)
+    ).
 
 ranked_actions(_Tag, _Features, Actions, Opts, Actions) :-
     memberchk(order(reference), Opts),

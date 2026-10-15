@@ -23,8 +23,8 @@ execute_action(open_list,
     is_list(Value),
     Step1 is Step+1.
 execute_action(close_frame,
-               ts([frame(list, [], _, Acc, root)|_], [], _Out, Vars, Step),
-               ts([frame(done, [], [], [], root)], [], Acc, Vars, Step1)) :-
+               ts([frame(list, [], _, Acc, root)|_], Data, _Out, Vars, Step),
+               ts([frame(done, [], [], [], root)], Data, Acc, Vars, Step1)) :-
     Step1 is Step+1.
 execute_action(close_frame,
                ts([frame(list, [], _, Acc, nested),

@@ -33,7 +33,8 @@ data_kind(Item, number) :- number(Item), !.
 data_kind(_, atom).
 
 legal_actions(ts([frame(done, _, _, _, _)|_], _, _, _, _), []) :- !.
-legal_actions(ts([frame(list, [], _, _, root)|_], [], _, _, _), [close_frame]) :- !.
+legal_actions(ts([frame(list, [], _, _, root)|_], _, _, _, _), [close_frame]) :- !.
+legal_actions(ts([frame(list, [], _, _, iteration(_))|_], _, _, _, _), [close_frame]) :- !.
 legal_actions(ts([frame(list, [], _, _, _)|_], [], _, _, _), [close_frame]) :- !.
 legal_actions(ts([frame(r, _, _, _, rmeta(Count, _))|_], Data, _, _, _), Actions) :-
     !,
