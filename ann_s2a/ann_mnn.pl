@@ -3,15 +3,28 @@
 :- dynamic ann_rule/3.
 
 mnn_scores(Tag, Features, Scores) :-
-    ( ann_rule(Tag, Features, Action) ->
-        findall(A-0, (mnn_action(Tag, A), A \= Action), Other),
-        Scores = [Action-1|Other]
-    ;
-        findall(Action-Score,
-            ( mnn_action(Tag, Action),
-              action_score(Tag, Action, Features, Score)
-            ), Scores)
-    ).
+    findall(Action-Score,
+        ( mnn_action(Tag, Action),
+          action_score(Tag, Action, Features, Score)
+        ), Scores).
+
+mnn_rule_scores(Tag, Features, Scores) :-
+    findall(Action-Score,
+        ( mnn_action(Tag, Action),
+          ( ann_rule(Tag, Features, RuleAction),
+            rule_action_matches(Action, RuleAction)
+          -> Score = 1 ; Score = 0 )
+        ), Scores).
+
+rule_action_matches(choose_nd, choose_nd(_)).
+rule_action_matches(propose_unit, propose_unit(_)).
+rule_action_matches(reuse_rjv, reuse_rjv(_)).
+rule_action_matches(Action, Action).
+
+canonical_action(choose_nd(_), choose_nd) :- !.
+canonical_action(propose_unit(_), propose_unit) :- !.
+canonical_action(reuse_rjv(_), reuse_rjv) :- !.
+canonical_action(Action, Action).
 
 mnn_action(t, bind).
 mnn_action(t, bind_typed).
@@ -41,12 +54,21 @@ mnn_action(g, fail).
 action_score(Tag, Action, Features, Score) :-
     findall(Contribution,
         ( member(Feature, Features),
-          mnn_weight(Tag, Action, Feature, Weight),
+          action_weighted_feature(Tag, Action, Feature, Weight),
           Contribution is Weight
         ), Contributions),
     sum_list(Contributions, Sum),
     ( mnn_bias(Tag, Action, Bias) -> true ; Bias = 0 ),
     Score is Sum+Bias.
+
+action_weighted_feature(Tag, Action, Feature, Weight) :-
+    mnn_weight(Tag, Action, Feature, Weight).
+action_weighted_feature(Tag, choose_nd, Feature, Weight) :-
+    mnn_weight(Tag, choose_nd(_), Feature, Weight).
+action_weighted_feature(Tag, propose_unit, Feature, Weight) :-
+    mnn_weight(Tag, propose_unit(_), Feature, Weight).
+action_weighted_feature(Tag, reuse_rjv, Feature, Weight) :-
+    mnn_weight(Tag, reuse_rjv(_), Feature, Weight).
 
 softmax(Scores, Probabilities) :-
     ( Scores = [] -> Probabilities = []
@@ -57,22 +79,22 @@ softmax(Scores, Probabilities) :-
           P is 1/N,
           maplist(score_probability(P), Scores, Probabilities)
       ;
-          probabilities_from_exps(Scores, Exps, Total, Probabilities)
+          findall(Action-P,
+              ( nth0(Index, Scores, Action-_),
+                nth0(Index, Exps, E),
+                P is E/Total
+              ), Probabilities)
       )
     ).
 
 score_probability(P, Action-_, Action-P).
 
-probabilities_from_exps([], [], _Total, []).
-probabilities_from_exps([Action-_|Scores], [E|Exps], Total, [Action-P|Ps]) :-
-    P is E/Total,
-    probabilities_from_exps(Scores, Exps, Total, Ps).
-
-save_mnn(Tag, File, Seed, Epochs, Rate) :-
+save_mnn(Tag, File, Seed, Epochs, Rate, Features, Actions, Accuracy) :-
     setup_call_cleanup(
         open(File, write, Stream),
-        ( format(Stream, '%% ANN-S2A MNN ~w, seed ~w, epochs ~w, rate ~w~n',
-                 [Tag, Seed, Epochs, Rate]),
+        ( format(Stream,
+                 '%% ANN-S2A MNN ~w, seed ~w, epochs ~w, rate ~w, features ~q, actions ~q, training_accuracy ~6f~n',
+                 [Tag, Seed, Epochs, Rate, Features, Actions, Accuracy]),
           forall(mnn_weight(Tag, Action, Feature, Weight),
                  portray_clause(Stream,
                      mnn_weight(Tag, Action, Feature, Weight))),

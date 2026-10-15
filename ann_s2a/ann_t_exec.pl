@@ -85,9 +85,13 @@ execute_action(skip_optional,
 execute_action(choose_nd(N),
                ts([frame(list, [[nd, Alternatives]|Rest], FD, Acc, Meta)|Frames],
                   Data, Out, Vars, Step),
-               ts([frame(list, [Alternative|Rest], FD, Acc, Meta)|Frames],
+               ts([frame(list, Pattern, FD, Acc, Meta)|Frames],
                   Data, Out, Vars, Step1)) :-
     nth1(N, Alternatives, Alternative),
+    ( is_list(Alternative) ->
+        append(Alternative, Rest, Pattern)
+    ; Pattern = [Alternative|Rest]
+    ),
     Step1 is Step+1.
 execute_action(halt, State, State).
 

@@ -1,14 +1,24 @@
 explain_step(Tag, Features, Action, Why) :-
+    ann_state_features(Tag, Features, Encoded),
     ( nonvar(Action) -> Actions = [Action]
     ; findall(A, mnn_action(Tag, A), Actions)
     ),
     findall(Contribution,
         ( member(A, Actions),
-          member(Feature, Features),
-          mnn_weight(Tag, A, Feature, Weight),
+          member(Feature, Encoded),
+          canonical_action(A, WeightAction),
+          action_weighted_feature(Tag, WeightAction, Feature, Weight),
           Contribution = contribution(A, Feature, Weight)
         ), Contributions),
     sort(3, @>=, Contributions, Why).
+
+ann_state_features(_Tag, Features, Features) :-
+    is_list(Features),
+    !.
+ann_state_features(g, State, Features) :-
+    encode_state_g(State, Features).
+ann_state_features(t, State, Features) :-
+    encode_state(State, Features).
 
 ann_g_trace(Specs, Steps) :-
     make_traces(g, Specs, Traces),

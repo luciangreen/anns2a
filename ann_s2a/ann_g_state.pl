@@ -14,8 +14,8 @@ encode_state_g(gs(done, _Stack, Out, Memo, _Step), [token(end), emitted(N), memo
     length(Out, N),
     length(Memo, M).
 
-token_kind(Token, open_bracket) :- memberchk(Token, ['[', "(", "{"]), !.
-token_kind(Token, close_bracket) :- memberchk(Token, [']', ")", "}"]), !.
+token_kind(Token, open_bracket) :- bracket_open(Token, _), !.
+token_kind(Token, close_bracket) :- bracket_close(Token, _), !.
 token_kind(Token, string) :- string(Token), !.
 token_kind(Token, number) :- number(Token), !.
 token_kind(Token, atom) :- atom(Token), !.
@@ -26,6 +26,8 @@ legal_actions_g(gs([], _, _, _, _), [halt]) :- !.
 legal_actions_g(gs([scan([])|_], [hyp(_, Count)|_], _, _, _), [close_repeat]) :-
     Count >= 2,
     !.
+legal_actions_g(gs([scan([])|_], [bracket(_, _, _, _)|_], _, _, _),
+                [close_bracket]) :- !.
 legal_actions_g(gs([scan([])|Rest], [], _, _, _), [next_work]) :-
     Rest \= [],
     !.
@@ -46,7 +48,39 @@ legal_actions_g(gs([scan(Tokens)|_], Stack, _, _, _), Actions) :-
               prefix_unit(Tokens, N, Unit),
               repeated_prefix_after(Tokens, N, Unit)
             ), Proposals),
-        append(Proposals, [shift], Actions)
+        ( Tokens = [Open|Rest],
+          bracket_content([Open|Rest], Open, _Close, _Inside, _After) ->
+            append([open_bracket|Proposals], [shift], Actions)
+        ;
+            append(Proposals, [shift], Actions)
+        )
+    ).
+
+bracket_open('[', ']').
+bracket_open('(', ')').
+bracket_open('{', '}').
+bracket_open("[", "]").
+bracket_open("(", ")").
+bracket_open("{", "}").
+
+bracket_close(']', ']').
+bracket_close(')', ')').
+bracket_close('}', '}').
+bracket_close("]", "]").
+bracket_close(")", ")").
+bracket_close("}", "}").
+
+bracket_content([Open|Tail], Open, Close, Inside, After) :-
+    bracket_open(Open, Close),
+    append(Inside, [Close|After], Tail),
+    foldl(bracket_scan, Inside, [Close], [Close]).
+
+bracket_scan(Token, Stack0, Stack) :-
+    ( bracket_open(Token, Closer) ->
+        Stack = [Closer|Stack0]
+    ; bracket_close(Token, Closer) ->
+        Stack0 = [Closer|Stack]
+    ; Stack = Stack0
     ).
 
 prefix_unit(Tokens, N, Unit) :-
@@ -55,7 +89,7 @@ prefix_unit(Tokens, N, Unit) :-
 
 repeated_prefix(Tokens, Unit) :-
     length(Unit, N),
-    append(Unit, Rest, Tokens),
+    append(Unit, _Rest, Tokens),
     N > 0.
 
 repeated_prefix_after(Tokens, N, Unit) :-

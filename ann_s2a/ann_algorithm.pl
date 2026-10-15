@@ -28,17 +28,34 @@ ann_algorithm_engine(both, In_vars, Out_var) :-
     ).
 
 with_s2a_matcher(Engine, Goal) :-
+    s2a_engine(Previous),
     setup_call_cleanup(
         ( retractall(s2a_engine(_)), assertz(s2a_engine(Engine)) ),
         call(Goal),
-        ( retractall(s2a_engine(_)), assertz(s2a_engine(recursive)) )).
+        ( retractall(s2a_engine(_)), assertz(s2a_engine(Previous)) )).
 
 ann_match_dispatch(RS0, D0, D2, T1, T22, T2_old, First) :-
     s2a_engine(Engine),
     ( Engine = recursive ->
         s2a_orig_rs_and_data_to_term(RS0, D0, D2, T1, T22, T2_old, First)
+    ; Engine = both ->
+        match_both(RS0, D0, D2, T1, T22, T2_old, First)
     ;
         ann_match_step(RS0, D0, D2, T1, T22, T2_old, First)
+    ).
+
+match_both(RS0, D0, D2, T1, T22, T2_old, First) :-
+    findall(D-Output,
+        with_s2a_matcher(recursive,
+            s2a_orig_rs_and_data_to_term(RS0, D0, D, T1, Output, T2_old, First)),
+        Recursive),
+    findall(D-Output,
+        with_s2a_matcher(ann,
+            ann_match_step(RS0, D0, D, T1, Output, T2_old, First)),
+        ANN),
+    ( Recursive == ANN ->
+        member(D2-T22, ANN)
+    ; throw(error(ann_s2a_mismatch(rs_and_data_to_term, Recursive, ANN), _))
     ).
 
 ann_match_step(RS0, D0, D2, T1, T22, _T2_old, First) :-
