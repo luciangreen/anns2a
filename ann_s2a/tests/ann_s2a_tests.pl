@@ -1,5 +1,6 @@
 :- use_module(library(filesex)).
 :- use_module(library(apply)).
+:- use_module(library(readutil)).
 
 :- prolog_load_context(directory, TestDir),
    directory_file_path(TestDir, '../ann_s2a.pl', Loader),
@@ -67,6 +68,36 @@ ann_test('AC-14', 'ANN S2A regression suite',
              (set_s2a_engine(both),
               test_s2a,
               set_s2a_engine(recursive)))).
+ann_test('M-4', 'hidden-layer training is reproducible',
+         ann_mnn_training_test).
+
+ann_mnn_training_test :-
+    tmp_file_stream(text, FirstFile, FirstStream),
+    close(FirstStream),
+    tmp_file_stream(text, SecondFile, SecondStream),
+    close(SecondStream),
+    setup_call_cleanup(
+        true,
+        ( Traces = [trace([pattern(variable)], [bind, fail], bind),
+                   trace([pattern(end)], [bind, fail], fail)],
+          train_mnn(t, Traces,
+                   [epochs(2), rate(0.1), hidden(3), seed(7),
+                    activation(relu), file(FirstFile)]),
+          train_mnn(t, Traces,
+                   [epochs(2), rate(0.1), hidden(3), seed(7),
+                    activation(relu), file(SecondFile)]),
+          read_file_to_codes(FirstFile, FirstCodes, []),
+          read_file_to_codes(SecondFile, SecondCodes, []),
+          FirstCodes == SecondCodes,
+          mnn_network(t, 3, relu),
+          findall(Hidden, mnn_hidden_bias(t, Hidden, _), HiddenUnits),
+          sort(HiddenUnits, [1, 2, 3]),
+          softmax([large-1000, smaller-999], Probabilities),
+          findall(P, member(_-P, Probabilities), ProbabilityValues),
+          sum_list(ProbabilityValues, Total),
+          abs(Total-1.0) < 1.0e-9
+        ),
+        ( delete_file(FirstFile), delete_file(SecondFile) )).
 
 count_results(Results, Successes, Failures, Skipped) :-
     include(=(success), Results, Passed),
