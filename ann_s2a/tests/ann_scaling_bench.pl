@@ -99,12 +99,17 @@ linfit(Pts, Intercept, Slope, R2) :-
     findall(X, member(X-_, Pts), Xs), findall(Y, member(_-Y, Pts), Ys),
     sum_list(Xs, SX), sum_list(Ys, SY),
     MX is SX/N, MY is SY/N,
-    foldl([X-Y, A0, A]>>(A is A0+(X-MX)*(Y-MY)), Pts, 0, Sxy),
-    foldl([X-_, A0, A]>>(A is A0+(X-MX)**2), Pts, 0, Sxx),
-    foldl([_-Y, A0, A]>>(A is A0+(Y-MY)**2), Pts, 0, Syy),
+    sums(Pts, MX, MY, 0, Sxy, 0, Sxx, 0, Syy),
     ( Sxx =:= 0 -> Slope = 0 ; Slope is Sxy/Sxx ),
     Intercept is MY-Slope*MX,
     ( Syy =:= 0 -> R2 = 1.0 ; R2 is (Sxy*Sxy)/(Sxx*Syy) ).
+
+sums([], _, _, Sxy, Sxy, Sxx, Sxx, Syy, Syy).
+sums([X-Y|T], MX, MY, Sxy0, Sxy, Sxx0, Sxx, Syy0, Syy) :-
+    Sxy1 is Sxy0+(X-MX)*(Y-MY),
+    Sxx1 is Sxx0+(X-MX)**2,
+    Syy1 is Syy0+(Y-MY)**2,
+    sums(T, MX, MY, Sxy1, Sxy, Sxx1, Sxx, Syy1, Syy).
 
 % Completeness: both engines must agree on every instance, failures included.
 check_agreement(Sizes) :-
