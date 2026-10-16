@@ -20,7 +20,11 @@ phase-specific state encoders, legal-action masks and executors,
 `ann_traverse/4` accepts `order(ann|reference)`, `policy(net|rules|oracle)`,
 and `max_steps(N)`. Phase state is passed explicitly as `gs/5` or `ts/5`.
 The Prolog weight and rule files are readable and replaceable. Training uses a
-fixed input order and seed, with no external ML library.
+fixed input order and seed, with no external ML library. `train_mnn/3` accepts
+`epochs(N)`, `rate(R)`, `hidden(N)`, `activation(relu|tanh)`, and `seed(N)`;
+the default network has 16 hidden units and uses ReLU. Training uses
+legal-action softmax cross-entropy and writes the layer weights to the
+phase-specific weight file. Pass `file(Path)` to write to a different path.
 
 The full program specification is in the repository's
 `ANN-S2A Prolog Program Requirements.docx`. BSD-3-Clause; Lucian Green is
